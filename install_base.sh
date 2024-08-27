@@ -3,61 +3,53 @@
 
 set -euo pipefail
 
-echo en_US.UTF-8 UTF-8 >> /etc/locale.gen
-
-function install_gnupg() {
+function install_essentials() {
   apt-get update
-  apt-get install -y --no-install-recommends gnupg
-    apt-key adv --keyserver keyserver.ubuntu.com --recv-keys ${GIT_CORE_PPA_KEY} \
-      || apt-key adv --keyserver pgp.mit.edu --recv-keys ${GIT_CORE_PPA_KEY} \
-      || apt-key adv --keyserver keyserver.pgp.com --recv-keys ${GIT_CORE_PPA_KEY}
+  apt-get install -y --no-install-recommends \
+    gnupg \
+    lsb-release \
+    curl \
+    tar \
+    unzip \
+    zip \
+    apt-transport-https \
+    ca-certificates \
+    sudo \
+    gpg-agent \
+    software-properties-common \
+    jq \
+    dirmngr \
+    locales \
+    dumb-init \
+    gosu
 }
 
 function install_main() {
   apt-get update
   apt-get install -y --no-install-recommends \
-      gnupg \
-      lsb-release \
-      curl \
-      tar \
-      unzip \
-      zip \
-      apt-transport-https \
-      ca-certificates \
-      sudo \
-      gpg-agent \
-      software-properties-common \
       build-essential \
       zlib1g-dev \
       zstd \
       gettext \
       libcurl4-openssl-dev \
       inetutils-ping \
-      jq \
       wget \
-      dirmngr \
       openssh-client \
-      locales \
       python3-pip \
       python3-setuptools \
       python3-venv \
       python3 \
-      dumb-init \
       nodejs \
       rsync \
       libpq-dev \
-      gosu \
       pkg-config
 }
 
-install_gnupg
-install_main
-
-DPKG_ARCH="$(dpkg --print-architecture)"
-LSB_RELEASE_CODENAME="$(lsb_release --codename | cut -f2)"
-sed -e 's/Defaults.*env_reset/Defaults env_keep = "HTTP_PROXY HTTPS_PROXY NO_PROXY FTP_PROXY http_proxy https_proxy no_proxy ftp_proxy"/' -i /etc/sudoers
-
 function install_git() {
+  apt-key adv --keyserver keyserver.ubuntu.com --recv-keys ${GIT_CORE_PPA_KEY} \
+    || apt-key adv --keyserver pgp.mit.edu --recv-keys ${GIT_CORE_PPA_KEY} \
+    || apt-key adv --keyserver keyserver.pgp.com --recv-keys ${GIT_CORE_PPA_KEY}
+
   ( [[ "${LSB_RELEASE_CODENAME}" == "focal" ]] \
    && (echo deb http://ppa.launchpad.net/git-core/ppa/ubuntu focal main>/etc/apt/sources.list.d/git-core.list ) || : )
 
@@ -167,6 +159,16 @@ function install_powershell() {
     && ln -s /opt/powershell/pwsh /usr/bin/pwsh )
 }
 
+
+echo en_US.UTF-8 UTF-8 >> /etc/locale.gen
+
+install_essentials
+
+DPKG_ARCH="$(dpkg --print-architecture)"
+LSB_RELEASE_CODENAME="$(lsb_release --codename | cut -f2)"
+sed -e 's/Defaults.*env_reset/Defaults env_keep = "HTTP_PROXY HTTPS_PROXY NO_PROXY FTP_PROXY http_proxy https_proxy no_proxy ftp_proxy"/' -i /etc/sudoers
+
+install_main
 install_git
 install_liblttng_ust
 install_awscli
