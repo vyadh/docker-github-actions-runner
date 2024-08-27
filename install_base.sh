@@ -4,7 +4,6 @@
 set -euo pipefail
 
 function install_essentials() {
-  apt-get update
   apt-get install -y --no-install-recommends \
     gnupg \
     lsb-release \
@@ -24,25 +23,36 @@ function install_essentials() {
     gosu
 }
 
-function install_main() {
-  apt-get update
+function install_development() {
   apt-get install -y --no-install-recommends \
-      build-essential \
-      zlib1g-dev \
-      zstd \
-      gettext \
-      libcurl4-openssl-dev \
-      inetutils-ping \
-      wget \
-      openssh-client \
-      python3-pip \
-      python3-setuptools \
-      python3-venv \
-      python3 \
-      nodejs \
-      rsync \
-      libpq-dev \
-      pkg-config
+    build-essential \
+    zlib1g-dev \
+    zstd \
+    gettext \
+    libcurl4-openssl-dev \
+    libpq-dev \
+    pkg-config
+}
+
+function install_networktools() {
+  apt-get install -y --no-install-recommends \
+    inetutils-ping \
+    wget \
+    openssh-client \
+    rsync
+}
+
+function install_python() {
+  apt-get install -y --no-install-recommends \
+    python3-pip \
+    python3-setuptools \
+    python3-venv \
+    python3
+}
+
+function install_nodejs() {
+  apt-get install -y --no-install-recommends \
+    nodejs
 }
 
 function install_git() {
@@ -162,13 +172,17 @@ function install_powershell() {
 
 echo en_US.UTF-8 UTF-8 >> /etc/locale.gen
 
+apt-get update
 install_essentials
 
 DPKG_ARCH="$(dpkg --print-architecture)"
 LSB_RELEASE_CODENAME="$(lsb_release --codename | cut -f2)"
 sed -e 's/Defaults.*env_reset/Defaults env_keep = "HTTP_PROXY HTTPS_PROXY NO_PROXY FTP_PROXY http_proxy https_proxy no_proxy ftp_proxy"/' -i /etc/sudoers
 
-install_main
+install_development
+install_python
+install_nodejs
+install_networktools
 install_git
 install_liblttng_ust
 install_awscli
