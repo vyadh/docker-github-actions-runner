@@ -7,7 +7,7 @@ selected_to_install=()
 source "$(dirname "$0")/installed_tools.sh"
 
 declare -A install=(
-  ["essentials"]="gnupg lsb-release curl tar unzip zip apt-transport-https ca-certificates sudo gpg-agent jq dirmngr locales dumb-init gosu"
+  ["essentials"]="gnupg curl tar unzip zip apt-transport-https ca-certificates sudo gpg-agent jq dirmngr locales dumb-init gosu"
   ["development"]="build-essential zlib1g-dev zstd gettext libcurl4-openssl-dev libpq-dev pkg-config software-properties-common"
   ["network-tools"]="inetutils-ping wget openssh-client rsync"
   ["python"]="python3-pip python3-setuptools python3-venv python3"
@@ -36,7 +36,8 @@ function configure_git() {
     || apt-key adv --keyserver pgp.mit.edu --recv-keys ${GIT_CORE_PPA_KEY} \
     || apt-key adv --keyserver keyserver.pgp.com --recv-keys ${GIT_CORE_PPA_KEY}
 
-  ( [[ "${LSB_RELEASE_CODENAME}" == "focal" ]] \
+  source /etc/os-release
+  ( [[ "${VERSION_CODENAME}" == "focal" ]] \
    && (echo deb http://ppa.launchpad.net/git-core/ppa/ubuntu focal main>/etc/apt/sources.list.d/git-core.list ) || : )
 }
 
@@ -70,12 +71,13 @@ function install_gitlfs() {
 }
 
 function configure_docker() {
-  distro=$(lsb_release -is | awk '{print tolower($0)}')
-  mkdir -p /etc/apt/keyrings
-  ( curl -fsSL https://download.docker.com/linux/${distro}/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg )
+  source /etc/os-release
 
-  version=$(lsb_release -cs | sed 's/trixie\|n\/a/bookworm/g')
-  ( echo "deb [arch=${DPKG_ARCH} signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/${distro} ${version} stable" \
+  mkdir -p /etc/apt/keyrings
+  ( curl -fsSL "https://download.docker.com/linux/$ID/gpg" | gpg --dearmor -o /etc/apt/keyrings/docker.gpg )
+
+  version=$(echo "$VERSION_CODENAME" | sed 's/trixie\|n\/a/bookworm/g')
+  ( echo "deb [arch=${DPKG_ARCH} signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/$ID ${version} stable" \
     | tee /etc/apt/sources.list.d/docker.list > /dev/null )
 }
 
@@ -89,7 +91,9 @@ function install_docker() {
 }
 
 function configure_container_tools() {
-  ( [[ "${LSB_RELEASE_CODENAME}" == "focal" ]] \
+  source /etc/os-release
+
+  ( [[ "${VERSION_CODENAME}" == "focal" ]] \
     && ( echo "available in 20.10 and higher" \
     && echo "deb https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/xUbuntu_20.04/ /" \
       | tee /etc/apt/sources.list.d/devel:kubic:libcontainers:stable.list \
@@ -184,7 +188,6 @@ apt-get update
 install_packages "essentials"
 
 DPKG_ARCH="$(dpkg --print-architecture)"
-LSB_RELEASE_CODENAME="$(lsb_release --codename | cut -f2)"
 sed -e 's/Defaults.*env_reset/Defaults env_keep = "HTTP_PROXY HTTPS_PROXY NO_PROXY FTP_PROXY http_proxy https_proxy no_proxy ftp_proxy"/' -i /etc/sudoers
 
 configure_sources
