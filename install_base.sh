@@ -1,24 +1,10 @@
 #!/usr/bin/env bash
-# hadolint ignore=SC2086,DL3015,DL3008,DL3013,SC2015
+# shellcheck disable=SC2086,DL3015,DL3008,DL3013,SC2015
 
 set -euo pipefail
 
-selected_to_install=(
-  "essentials"
-  "development"
-  "network-tools"
-  "python"
-  "nodejs"
-  "git"
-  "debugging-tools"
-  "aws-cli"
-  "git-lfs"
-  "docker"
-  "container-tools"
-  "github-cli"
-  "yq"
-  "powershell"
-)
+selected_to_install=()
+source "$(dirname "$0")/installed_tools.sh"
 
 declare -A install=(
   ["essentials"]="gnupg lsb-release curl tar unzip zip apt-transport-https ca-certificates sudo gpg-agent jq dirmngr locales dumb-init gosu"

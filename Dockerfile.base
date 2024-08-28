@@ -12,5 +12,5 @@ ENV LC_ALL=en_US.UTF-8
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 ENV DEBIAN_FRONTEND=noninteractive
 
-COPY --chmod=700 install_base.sh /tmp/install_base.sh
-RUN /tmp/install_base.sh && rm /tmp/install_base.sh
+COPY --chmod=755 install_base.sh installed_tools.sh /tmp/
+RUN /tmp/install_base.sh
