@@ -3,73 +3,63 @@
 
 set -euo pipefail
 
-function install_essentials() {
-  apt-get install -y --no-install-recommends \
-    gnupg \
-    lsb-release \
-    curl \
-    tar \
-    unzip \
-    zip \
-    apt-transport-https \
-    ca-certificates \
-    sudo \
-    gpg-agent \
-    software-properties-common \
-    jq \
-    dirmngr \
-    locales \
-    dumb-init \
-    gosu
+selected_to_install=(
+  "essentials"
+  "development"
+  "network-tools"
+  "python"
+  "nodejs"
+  "git"
+  "debugging-tools"
+  "aws-cli"
+  "git-lfs"
+  "docker"
+  "container-tools"
+  "github-cli"
+  "yq"
+  "powershell"
+)
+
+declare -A install=(
+  ["essentials"]="gnupg lsb-release curl tar unzip zip apt-transport-https ca-certificates sudo gpg-agent jq dirmngr locales dumb-init gosu"
+  ["development"]="build-essential zlib1g-dev zstd gettext libcurl4-openssl-dev libpq-dev pkg-config software-properties-common"
+  ["network-tools"]="inetutils-ping wget openssh-client rsync"
+  ["python"]="python3-pip python3-setuptools python3-venv python3"
+  ["nodejs"]="nodejs"
+  ["docker"]="docker-ce docker-ce-cli docker-buildx-plugin containerd.io docker-compose-plugin"
+  ["container-tools"]="podman buildah skopeo"
+)
+
+function is_selected() {
+  for selected in "${selected_to_install[@]}"; do
+    if [[ "$selected" == "$1" ]]; then
+      return 0
+    fi
+  done
+  return 1
 }
 
-function install_development() {
-  apt-get install -y --no-install-recommends \
-    build-essential \
-    zlib1g-dev \
-    zstd \
-    gettext \
-    libcurl4-openssl-dev \
-    libpq-dev \
-    pkg-config
+function install_packages() {
+  local packages=${install[$1]}
+  read -r -a args <<< "$packages"
+  apt-get install -y --no-install-recommends "${args[@]}"
 }
 
-function install_networktools() {
-  apt-get install -y --no-install-recommends \
-    inetutils-ping \
-    wget \
-    openssh-client \
-    rsync
-}
-
-function install_python() {
-  apt-get install -y --no-install-recommends \
-    python3-pip \
-    python3-setuptools \
-    python3-venv \
-    python3
-}
-
-function install_nodejs() {
-  apt-get install -y --no-install-recommends \
-    nodejs
-}
-
-function install_git() {
+function configure_git() {
   apt-key adv --keyserver keyserver.ubuntu.com --recv-keys ${GIT_CORE_PPA_KEY} \
     || apt-key adv --keyserver pgp.mit.edu --recv-keys ${GIT_CORE_PPA_KEY} \
     || apt-key adv --keyserver keyserver.pgp.com --recv-keys ${GIT_CORE_PPA_KEY}
 
   ( [[ "${LSB_RELEASE_CODENAME}" == "focal" ]] \
    && (echo deb http://ppa.launchpad.net/git-core/ppa/ubuntu focal main>/etc/apt/sources.list.d/git-core.list ) || : )
+}
 
-  apt-get update
-
+function install_git() {
   ( apt-get install -y --no-install-recommends git \
    || apt-get install -t stable -y --no-install-recommends git )
 }
 
-function install_liblttng_ust() {
+function install_debugging_tools() {
   ( [[ $(apt-cache search -n liblttng-ust0 | awk '{print $1}') == "liblttng-ust0" ]] \
     && apt-get install -y --no-install-recommends liblttng-ust0 || : )
 
@@ -93,7 +83,7 @@ function install_gitlfs() {
     && rm -rf /tmp/lfs.tar.gz /tmp/git-lfs-${GIT_LFS_VERSION}
 }
 
-function install_docker() {
+function configure_docker() {
   distro=$(lsb_release -is | awk '{print tolower($0)}')
   mkdir -p /etc/apt/keyrings
   ( curl -fsSL https://download.docker.com/linux/${distro}/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg )
@@ -101,24 +91,28 @@ function install_docker() {
   version=$(lsb_release -cs | sed 's/trixie\|n\/a/bookworm/g')
   ( echo "deb [arch=${DPKG_ARCH} signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/${distro} ${version} stable" \
     | tee /etc/apt/sources.list.d/docker.list > /dev/null )
+}
 
-  apt-get update
-  apt-get install -y docker-ce docker-ce-cli docker-buildx-plugin containerd.io docker-compose-plugin --no-install-recommends --allow-unauthenticated
+function install_docker() {
+  install_packages "docker"
 
   echo -e '#!/bin/sh\ndocker compose --compatibility "$@"' > /usr/local/bin/docker-compose \
     && chmod +x /usr/local/bin/docker-compose
+
+  sed -i 's/ulimit -Hn/# ulimit -Hn/g' /etc/init.d/docker
 }
 
-function install_container_tools() {
+function configure_container_tools() {
   ( [[ "${LSB_RELEASE_CODENAME}" == "focal" ]] \
     && ( echo "available in 20.10 and higher" \
     && echo "deb https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/xUbuntu_20.04/ /" \
       | tee /etc/apt/sources.list.d/devel:kubic:libcontainers:stable.list \
     && curl -L "https://build.opensuse.org/projects/devel:kubic/signing_keys/download?kind=gpg" \
       | apt-key add - ) || : )
+}
 
-  apt-get update
-  ( apt-get install -y --no-install-recommends podman buildah skopeo || : )
+function install_container_tools() {
+  ( install "container-tools" || : )
 }
 
 function install_githubcli() {
@@ -169,33 +163,51 @@ function install_powershell() {
     && ln -s /opt/powershell/pwsh /usr/bin/pwsh )
 }
 
+function configure_sources() {
+  if is_selected "git" || is_selected "git-lfs"; then
+    configure_git
+  fi
+  if is_selected "docker"; then
+    configure_docker
+  fi
+  if is_selected "container-tools"; then
+    configure_container_tools
+  fi
+}
+
+function install_selected_packages() {
+  is_selected "development" && install_packages "development"
+  (is_selected "python" || is_selected "aws-cli") && install_packages "python"
+  is_selected "nodejs" && install_packages "nodejs"
+  is_selected "network-tools" && install_packages "network-tools"
+  (is_selected "git" || is_selected "git-lfs") && install_git
+  is_selected "debugging-tools" && install_debugging_tools
+  is_selected "aws-cli" && install_awscli
+  is_selected "git-lfs" && install_gitlfs
+  is_selected "docker" && install_docker
+  is_selected "container-tools" && install_container_tools
+  is_selected "github-cli" && install_githubcli
+  is_selected "yq" && install_yq
+  is_selected "powershell" && install_powershell
+}
+
 
 echo en_US.UTF-8 UTF-8 >> /etc/locale.gen
 
 apt-get update
-install_essentials
+install_packages "essentials"
 
 DPKG_ARCH="$(dpkg --print-architecture)"
 LSB_RELEASE_CODENAME="$(lsb_release --codename | cut -f2)"
 sed -e 's/Defaults.*env_reset/Defaults env_keep = "HTTP_PROXY HTTPS_PROXY NO_PROXY FTP_PROXY http_proxy https_proxy no_proxy ftp_proxy"/' -i /etc/sudoers
 
-install_development
-install_python
-install_nodejs
-install_networktools
-install_git
-install_liblttng_ust
-install_awscli
-install_gitlfs
-install_docker
-install_container_tools
-install_githubcli
-install_yq
-install_powershell
+configure_sources
+apt-get update
+
+install_selected_packages
 
 rm -rf /var/lib/apt/lists/*
 rm -rf /tmp/*
-sed -i 's/ulimit -Hn/# ulimit -Hn/g' /etc/init.d/docker
 groupadd -g 121 runner
 useradd -mr -d /home/runner -u 1001 -g 121 runner
 usermod -aG sudo runner
