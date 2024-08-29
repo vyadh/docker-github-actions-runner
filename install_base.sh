@@ -7,12 +7,13 @@ selected_to_install=()
 source "$(dirname "$0")/installed_tools.sh"
 
 declare -A install=(
-  ["essentials"]="gnupg curl tar unzip zip apt-transport-https ca-certificates sudo gpg-agent jq dirmngr locales dumb-init gosu"
+  ["bootstrap"]="gnupg curl tar unzip zip apt-transport-https ca-certificates sudo jq dirmngr locales gosu"
+  ["essentials"]="gpg-agent dumb-init docker-ce-cli"
   ["development"]="build-essential zlib1g-dev zstd gettext libcurl4-openssl-dev libpq-dev pkg-config software-properties-common"
   ["network-tools"]="inetutils-ping wget openssh-client rsync"
   ["python"]="python3-pip python3-setuptools python3-venv python3"
   ["nodejs"]="nodejs"
-  ["docker"]="docker-ce docker-ce-cli docker-buildx-plugin containerd.io docker-compose-plugin"
+  ["docker"]="docker-ce docker-buildx-plugin containerd.io docker-compose-plugin"
   ["container-tools"]="podman buildah skopeo"
 )
 
@@ -154,12 +155,12 @@ function install_powershell() {
 }
 
 function configure_sources() {
+  configure_docker
+
   if is_selected "git" || is_selected "git-lfs"; then
     configure_git
   fi
-  if is_selected "docker"; then
-    configure_docker
-  fi
+
   if is_selected "container-tools"; then
     configure_container_tools
   fi
@@ -178,21 +179,21 @@ function install_selected_packages() {
   is_selected "container-tools" && install_container_tools
   is_selected "github-cli" && install_githubcli
   is_selected "yq" && install_yq
-  is_selected "powershell" && install_powershell
+  is_selected "powershell" && install_powershell || true
 }
 
 
 echo en_US.UTF-8 UTF-8 >> /etc/locale.gen
 
 apt-get update
-install_packages "essentials"
+install_packages "bootstrap"
 
 DPKG_ARCH="$(dpkg --print-architecture)"
 sed -e 's/Defaults.*env_reset/Defaults env_keep = "HTTP_PROXY HTTPS_PROXY NO_PROXY FTP_PROXY http_proxy https_proxy no_proxy ftp_proxy"/' -i /etc/sudoers
 
 configure_sources
 apt-get update
-
+install_packages "essentials"
 install_selected_packages
 
 rm -rf /var/lib/apt/lists/*
@@ -200,6 +201,8 @@ rm -rf /tmp/*
 groupadd -g 121 runner
 useradd -mr -d /home/runner -u 1001 -g 121 runner
 usermod -aG sudo runner
-usermod -aG docker runner
+if is_selected "docker"; then
+  usermod -aG docker runner
+fi
 echo '%sudo ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers
 ( [[ -f /etc/apt/sources.list.d/devel:kubic:libcontainers:stable.list ]] && rm /etc/apt/sources.list.d/devel:kubic:libcontainers:stable.list || : )
