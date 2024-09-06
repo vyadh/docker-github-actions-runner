@@ -1,15 +1,7 @@
 name: GitHub Actions Runner in Docker - Base
 on:
-  push:
-    paths:
-      - Dockerfile.base
-      - .github/workflows/base.yml
-      - goss*
-    branches:
-      - master
-      - develop
-  schedule:
-    - cron:  '0 22 * * *'
+  workflow_dispatch: {}
+
 
 jobs:
   ubuntu_base_tests:

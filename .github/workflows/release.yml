@@ -1,8 +1,6 @@
 name: GitHub Actions Runner in Docker - Release
 on:
-  push:
-    tags:
-      - '*'
+  workflow_dispatch: {}
 
 permissions:
   contents: write
