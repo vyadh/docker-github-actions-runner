@@ -10,6 +10,8 @@ on:
       - develop
   schedule:
     - cron:  '0 22 * * *'
+  workflow_dispatch: {}
+
 
 jobs:
   ubuntu_base_tests:
